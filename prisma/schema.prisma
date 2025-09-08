@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  walletAddress   String   @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Points tracking
+  tournamentPoints Int      @default(0)
+  skillPoints      Int      @default(0)
+  
+  // Relations
+  players         Player[]
+  transactions    Transaction[]
+  pointHistory    PointHistory[]
+  buyTokensTxs    BuyTokensTransaction[]
+  
+  @@map("users")
+}
+
+model Player {
+  id            String   @id @default(uuid())
+  nftTokenId    String   @unique
+  contractAddress String
+  name          String?
+  position      String?
+  team          String?
+  rarity        String?
+  stats         String?  // JSON stored as text for SQLite compatibility
+  isBenched     Boolean  @default(true)
+  
+  // Owner information
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("players")
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type            String   // TransactionType as string for SQLite
+  amount          Int
+  pointType       String   // PointType as string for SQLite
+  description     String?
+  
+  // Blockchain transaction data (optional)
+  blockchainTxHash String?
+  blockNumber      Int?
+  
+  createdAt       DateTime @default(now())
+  
+  @@map("transactions")
+}
+
+model PointHistory {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  pointType       String   // PointType as string for SQLite
+  change          Int      // Can be positive or negative
+  previousBalance Int
+  newBalance      Int
+  reason          String
+  
+  createdAt       DateTime @default(now())
+  
+  @@map("point_history")
+}
+
+model PlayerPack {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  cost            Int
+  pointType       String   // PointType as string for SQLite
+  rarity          String
+  isActive        Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("player_packs")
+}
+
+model GameEvent {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean  @default(true)
+  
+  // Point rewards
+  tournamentReward Int     @default(0)
+  skillReward     Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("game_events")
+}
+
+model BuyTokensTransaction {
+  id                  String   @id @default(uuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  nonceUsed           Int
+  playerTokenIds      String   // JSON array as string for SQLite
+  amounts             String   // JSON array as string for SQLite
+  maxCurrencySpend    String
+  deadline            Int
+  signature           String
+  
+  status              String   @default("pending") // pending, confirmed, failed
+  txHash              String?
+  
+  createdAt           DateTime @default(now())
+  confirmedAt         DateTime?
+  
+  @@map("buy_tokens_transactions")
+}
