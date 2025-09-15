@@ -25,6 +25,7 @@ model User {
   transactions    Transaction[]
   pointHistory    PointHistory[]
   buyTokensTxs    BuyTokensTransaction[]
+  sellTokensTxs   SellTokensTransaction[]
   
   @@map("users")
 }
@@ -38,7 +39,6 @@ model Player {
   team          String?
   rarity        String?
   stats         String?  // JSON stored as text for SQLite compatibility
-  isBenched     Boolean  @default(true)
   
   // Owner information
   ownerId       String
@@ -137,4 +137,25 @@ model BuyTokensTransaction {
   confirmedAt         DateTime?
   
   @@map("buy_tokens_transactions")
+}
+
+model SellTokensTransaction {
+  id                  String   @id @default(uuid())
+  userAddress         String
+  user                User     @relation(fields: [userAddress], references: [walletAddress], onDelete: Cascade)
+  
+  playerTokenIds      String   // JSON array as string for SQLite
+  amounts             String   // JSON array as string for SQLite
+  minCurrencyToReceive Int
+  deadline            Int
+  nonce               Int
+  signature           String
+  
+  status              String   @default("pending") // pending, confirmed, failed
+  txHash              String?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@map("sell_tokens_transactions")
 }

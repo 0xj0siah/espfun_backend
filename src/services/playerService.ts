@@ -148,23 +148,7 @@ export class PlayerService {
     });
   }
 
-  async updatePlayerStatus(playerId: string, userId: string, isBenched: boolean) {
-    const player = await this.getPrisma().player.findFirst({
-      where: {
-        id: playerId,
-        ownerId: userId
-      }
-    });
 
-    if (!player) {
-      throw new Error('Player not found or not owned by user');
-    }
-
-    return await this.getPrisma().player.update({
-      where: { id: playerId },
-      data: { isBenched }
-    });
-  }
 
   async checkUserSkillPoints(walletAddress: string, requiredPoints: number): Promise<boolean> {
     const user = await this.getPrisma().user.findUnique({
@@ -179,6 +163,18 @@ export class PlayerService {
   }
 
   async deductSkillPoints(walletAddress: string, points: number): Promise<void> {
+    // Get user data before update to record the previous balance
+    const userBefore = await this.getPrisma().user.findUnique({
+      where: { walletAddress: walletAddress.toLowerCase() }
+    });
+
+    if (!userBefore) {
+      throw new Error('User not found');
+    }
+
+    const previousBalance = userBefore.skillPoints;
+    const newBalance = previousBalance - points;
+
     await this.getPrisma().user.update({
       where: { walletAddress: walletAddress.toLowerCase() },
       data: {
@@ -189,53 +185,62 @@ export class PlayerService {
     });
 
     // Record the transaction
-    const user = await this.getPrisma().user.findUnique({
-      where: { walletAddress: walletAddress.toLowerCase() }
-    });
-
-    if (user) {
-      await this.getPrisma().transaction.create({
-        data: {
-          userId: user.id,
-          type: 'PLAYER_PROMOTION',
-          amount: points,
-          pointType: 'SKILL',
-          description: `Promoted players for ${points} skill points`
-        }
-      });
-
-      await this.getPrisma().pointHistory.create({
-        data: {
-          userId: user.id,
-          pointType: 'SKILL',
-          change: -points,
-          previousBalance: user.skillPoints,
-          newBalance: user.skillPoints - points,
-          reason: `Promoted players for ${points} skill points`
-        }
-      });
-    }
-  }
-
-  async addTournamentPoints(walletAddress: string, points: number): Promise<void> {
-    await this.getPrisma().user.update({
-      where: { walletAddress: walletAddress.toLowerCase() },
+    await this.getPrisma().transaction.create({
       data: {
-        tournamentPoints: {
-          increment: points
-        }
+        userId: userBefore.id,
+        type: 'PLAYER_PROMOTION',
+        amount: points,
+        pointType: 'SKILL',
+        description: `Promoted players for ${points} skill points`
       }
     });
 
-    // Record the transaction
-    const user = await this.getPrisma().user.findUnique({
+    await this.getPrisma().pointHistory.create({
+      data: {
+        userId: userBefore.id,
+        pointType: 'SKILL',
+        change: -points,
+        previousBalance: previousBalance,
+        newBalance: newBalance,
+        reason: `Promoted players for ${points} skill points`
+      }
+    });
+  }
+
+  async addTournamentPoints(walletAddress: string, points: number): Promise<void> {
+    logger.info(`Adding ${points} tournament points to user: ${walletAddress}`);
+    
+    // Get user data before update to record the previous balance
+    const userBefore = await this.getPrisma().user.findUnique({
       where: { walletAddress: walletAddress.toLowerCase() }
     });
 
-    if (user) {
+    if (!userBefore) {
+      logger.error(`User not found when adding tournament points: ${walletAddress}`);
+      throw new Error(`User not found: ${walletAddress}`);
+    }
+
+    logger.info(`Found user ${userBefore.id}, current tournament points: ${userBefore.tournamentPoints}`);
+
+    const previousBalance = userBefore.tournamentPoints;
+    const newBalance = previousBalance + points;
+
+    try {
+      await this.getPrisma().user.update({
+        where: { walletAddress: walletAddress.toLowerCase() },
+        data: {
+          tournamentPoints: {
+            increment: points
+          }
+        }
+      });
+
+      logger.info(`Updated user tournament points from ${previousBalance} to ${newBalance}`);
+
+      // Record the transaction
       await this.getPrisma().transaction.create({
         data: {
-          userId: user.id,
+          userId: userBefore.id,
           type: 'PLAYER_CUT',
           amount: points,
           pointType: 'TOURNAMENT',
@@ -243,16 +248,23 @@ export class PlayerService {
         }
       });
 
+      logger.info(`Created transaction record for user ${userBefore.id}`);
+
       await this.getPrisma().pointHistory.create({
         data: {
-          userId: user.id,
+          userId: userBefore.id,
           pointType: 'TOURNAMENT',
           change: points,
-          previousBalance: user.tournamentPoints,
-          newBalance: user.tournamentPoints + points,
+          previousBalance: previousBalance,
+          newBalance: newBalance,
           reason: `Cut players and earned ${points} tournament points`
         }
       });
+
+      logger.info(`Created point history record for user ${userBefore.id}`);
+    } catch (dbError) {
+      logger.error(`Database error when adding tournament points:`, dbError);
+      throw new Error(`Database error: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`);
     }
   }
 
@@ -260,6 +272,8 @@ export class PlayerService {
     this.checkPackIssuer();
 
     try {
+      logger.info(`Starting cutPlayers for user: ${request.userAddress}`);
+      
       // Validate input arrays have same length (contract requires this)
       if (request.playerIds.length !== request.shares.length) {
         return {
@@ -275,6 +289,21 @@ export class PlayerService {
           error: 'At least one player must be specified for cutting'
         };
       }
+
+      // Check if user exists in database before proceeding
+      const userExists = await this.getPrisma().user.findUnique({
+        where: { walletAddress: request.userAddress.toLowerCase() }
+      });
+
+      if (!userExists) {
+        logger.error(`User not found in database: ${request.userAddress}`);
+        return {
+          success: false,
+          error: 'User not found in database. Please ensure you are logged in.'
+        };
+      }
+
+      logger.info(`User found in database: ${userExists.id}`);
 
       // Get DevelopmentPlayers contract
       const developmentPlayersAbi = [
@@ -301,15 +330,35 @@ export class PlayerService {
       // For now, we'll use a simple calculation for points earned
       // In a real implementation, you might want to get this from the contract or calculate based on player values
       const POINTS_PER_SHARE = 10;
-      const pointsEarned = request.shares.reduce((sum, shares) => sum + (shares * POINTS_PER_SHARE), 0);
+      
+      // Convert wei values to ether for calculation (shares are likely in wei format)
+      const pointsEarned = request.shares.reduce((sum, shares) => {
+        // Convert from wei to ether (divide by 10^18) then multiply by points per share
+        const sharesInEther = Number(ethers.formatEther(shares.toString()));
+        return sum + (sharesInEther * POINTS_PER_SHARE);
+      }, 0);
+
+      // Round to avoid floating point precision issues and ensure it's an integer
+      let roundedPoints = Math.round(pointsEarned);
+
+      // Safety check to ensure points fit in database integer field (max ~9 * 10^18)
+      const MAX_POINTS = 2147483647; // 32-bit signed int max for safety
+      if (roundedPoints > MAX_POINTS) {
+        logger.warn(`Points calculated (${roundedPoints}) exceeds maximum, capping at ${MAX_POINTS}`);
+        roundedPoints = MAX_POINTS;
+      }
+
+      logger.info(`Calculated points earned: ${roundedPoints} (from shares: ${request.shares.join(', ')})`);
 
       // Add tournament points to user
-      await this.addTournamentPoints(request.userAddress, pointsEarned);
+      await this.addTournamentPoints(request.userAddress, roundedPoints);
+
+      logger.info(`Successfully added ${roundedPoints} tournament points to user ${request.userAddress}`);
 
       return {
         success: true,
         txHash: receipt.transactionHash,
-        pointsEarned
+        pointsEarned: roundedPoints
       };
 
     } catch (error) {

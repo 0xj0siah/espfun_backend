@@ -8,7 +8,6 @@ A secure backend API for fantasy esports gaming on the Monad blockchain. This sy
 - 🏆 **NFT Player Management** - Sync and manage player NFTs from Monad blockchain
 - 💰 **Dual Point System** - Tournament points and skill points with transaction history
 - 📦 **Player Pack System** - Purchase and open player packs using tournament points on Monad blockchain
-- ⚡ **Benchwarmer System** - Unbench players using skill points
 - 🛡️ **Security Features** - Rate limiting, input validation, CORS protection
 - 📊 **Admin Dashboard** - Administrative tools for platform management
 - 📖 **API Documentation** - Swagger/OpenAPI documentation
@@ -86,8 +85,6 @@ API documentation at `http://localhost:3000/api-docs`
 ### Players (NFTs)
 - `POST /api/players/sync` - Sync NFT players from blockchain
 - `GET /api/players` - Get user's players
-- `POST /api/players/:playerId/unbench` - Unbench player (costs skill points)
-- `POST /api/players/:playerId/bench` - Bench player
 
 ### Points System
 - `GET /api/points/balance` - Get point balances
@@ -147,9 +144,8 @@ API documentation at `http://localhost:3000/api-docs`
 - Required for competitive features
 
 ### Skill Points  
-- Used for unbenching players and skill packs
+- Used for skill packs and player promotions
 - Earned through achievements and challenges
-- Cost: 10 skill points to unbench a player
 
 ### Transaction Types
 - `EARNED`: Points gained through gameplay
