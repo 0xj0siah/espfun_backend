@@ -103,13 +103,13 @@ router.post('/login', [
 
   // Find or create user
   let user = await prisma.user.findUnique({
-    where: { walletAddress }
+    where: { walletAddress: walletAddress.toLowerCase() }
   });
 
   if (!user) {
     user = await prisma.user.create({
       data: {
-        walletAddress,
+        walletAddress: walletAddress.toLowerCase(),
         tournamentPoints: 100, // Starting tournament points
         skillPoints: 50       // Starting skill points
       }
