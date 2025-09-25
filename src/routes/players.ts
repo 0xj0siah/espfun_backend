@@ -59,8 +59,7 @@ router.post('/sync', authenticateToken, [
             nftTokenId: nft.tokenId,
             contractAddress,
             ownerId: req.user!.id,
-            name: `Player #${nft.tokenId}`,
-            isBenched: true
+            name: `Player #${nft.tokenId}`
           }
         });
       } else if (player.ownerId !== req.user!.id) {
