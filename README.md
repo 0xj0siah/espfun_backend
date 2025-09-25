@@ -249,28 +249,46 @@ The pack issuer wallet must have the `PACK_ISSUER_ROLE` on the PlayerPack contra
 
 ## Deployment
 
-### Production Setup
+### Local Development
+```bash
+npm run dev
+```
 
-1. **Environment Configuration**:
-   - Set `NODE_ENV=production`
-   - Use strong JWT secret (32+ characters)
-   - Configure production database
-   - Set up Redis instance
-   - Configure CORS origins
+### Vercel Deployment (Recommended)
 
-2. **Database Setup**:
+The backend is configured for serverless deployment on Vercel:
+
+1. **Prerequisites**:
+   - Vercel account
+   - PostgreSQL database (Neon, Supabase, or Railway recommended)
+
+2. **Deploy**:
    ```bash
-   npx prisma migrate deploy
-   npx prisma generate
+   # Install dependencies
+   npm install
+   
+   # Deploy to Vercel
+   npm run vercel:deploy
    ```
 
-3. **Build and Start**:
-   ```bash
-   npm run build
-   npm start
+3. **Environment Variables**:
+   Set the following in Vercel dashboard:
+   ```env
+   DATABASE_URL=postgresql://...
+   JWT_SECRET=your-secure-jwt-key
+   MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+   TX_SIGNER_PRIVATE_KEY=your-key
+   PACK_ISSUER_PRIVATE_KEY=your-key
    ```
 
-### Docker Deployment (Optional)
+4. **Database Setup**:
+   ```bash
+   npx prisma db push
+   ```
+
+See [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md) for detailed instructions.
+
+### Docker Deployment
 ```dockerfile
 FROM node:18-alpine
 WORKDIR /app
