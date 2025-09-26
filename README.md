@@ -258,7 +258,7 @@ npm run dev
 
 The backend is configured for serverless deployment on Vercel:
 
-**Production URL**: https://espfun-backend-l3ro9a6xj-0xj0siahs-projects.vercel.app
+**Production URL**: https://espfun-backend-prqx15uu5-0xj0siahs-projects.vercel.app
 
 1. **Prerequisites**:
    - Vercel account
