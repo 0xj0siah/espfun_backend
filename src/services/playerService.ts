@@ -379,8 +379,8 @@ export class PlayerService {
     }
 
     // Calculate cost: base cost per player + additional cost per share
-    const BASE_COST_PER_PLAYER = 50; // Base skill points per player
-    const COST_PER_SHARE = 25; // Additional skill points per share
+    const BASE_COST_PER_PLAYER = 0; // Base skill points per player
+    const COST_PER_SHARE = 1; // Additional skill points per share
     
     let totalCost = 0;
     for (let i = 0; i < playerIds.length; i++) {
